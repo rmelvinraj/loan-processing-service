@@ -9,6 +9,9 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR,
     APPLICATION_ALREADY_DECIDED,
 
+    //EMI Calculation
+    EMI_CALCULATION_FAILED,
+
     //Eligibility Rule
     CREDIT_SCORE_LOW
 }

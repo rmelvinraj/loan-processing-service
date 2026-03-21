@@ -1,5 +1,6 @@
 package com.melvin.lending.loan_processing_service.service;
 
+import com.melvin.lending.loan_processing_service.exception.EmiCalculationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -36,34 +37,54 @@ public class EmiCalculationService {
 
         log.debug("Calculating EMI: principal={}, annualRate={}%, tenure={}m",
                 principal, annualRatePercent, tenureMonths);
-
-
-        // Handle zero interest rate (edge case)
-        if (annualRatePercent.compareTo(BigDecimal.ZERO) == 0) {
-            BigDecimal emi = principal.divide(BigDecimal.valueOf(tenureMonths), SCALE, ROUNDING);
-            log.debug("Zero interest rate detected, EMI={}", emi);
-            return emi;
+        // 1️Guard clauses for invalid input
+        if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw EmiCalculationException.invalidPrincipal();
         }
+        if (tenureMonths <= 0) {
+            throw EmiCalculationException.invalidTenure(tenureMonths);
+        }
+        if (annualRatePercent == null) {
+            throw EmiCalculationException.calculationError(
+                    new IllegalArgumentException("Annual interest rate cannot be null"));
+        }
+        try {
 
-        // Monthly rate: r = annualRate / 12 / 100
-        BigDecimal monthlyRate = annualRatePercent
-                .divide(HUNDRED.multiply(TWELVE), MC);
+            // Handle zero interest rate (edge case)
+            if (annualRatePercent.compareTo(BigDecimal.ZERO) == 0) {
+                BigDecimal emi = principal.divide(BigDecimal.valueOf(tenureMonths), SCALE, ROUNDING);
+                log.debug("Zero interest rate detected, EMI={}", emi);
+                return emi;
+            }
 
-        // (1 + r)^n
-        BigDecimal onePlusR = ONE.add(monthlyRate, MC);
-        BigDecimal onePlusRpowN = onePlusR.pow(tenureMonths, MC);
+            // Monthly rate: r = annualRate / 12 / 100
+            BigDecimal monthlyRate = annualRatePercent.divide(HUNDRED.multiply(TWELVE), MC);
 
-        // EMI formula EMI = P × r × (1 + r)^n / (1 + r)^n − 1
-        BigDecimal numerator = principal
-                .multiply(monthlyRate, MC)
-                .multiply(onePlusRpowN, MC);
+            // (1 + r)^n
+            BigDecimal onePlusR = ONE.add(monthlyRate, MC);
+            BigDecimal onePlusRpowN = onePlusR.pow(tenureMonths, MC);
 
-        BigDecimal denominator = onePlusRpowN.subtract(ONE, MC);
+            // EMI formula EMI = P × r × (1 + r)^n / (1 + r)^n − 1
+            BigDecimal numerator = principal
+                    .multiply(monthlyRate, MC)
+                    .multiply(onePlusRpowN, MC);
 
-        BigDecimal emi = numerator.divide(denominator, SCALE, ROUNDING);
+            BigDecimal denominator = onePlusRpowN.subtract(ONE, MC);
 
-        log.debug("Calculated EMI={}", emi);
-        return emi;
+            // Edge case: denominator cannot be zero
+            if (denominator.compareTo(BigDecimal.ZERO) == 0) {
+                throw EmiCalculationException.zeroDenominator();
+            }
+
+            BigDecimal emi = numerator.divide(denominator, SCALE, ROUNDING);
+            log.debug("Calculated EMI={}", emi);
+
+            return emi;
+
+        } catch (ArithmeticException | IllegalArgumentException ex) {
+            // Wrap calculation error in custom exception
+            throw EmiCalculationException.calculationError(ex);
+        }
     }
 
 }

@@ -17,6 +17,24 @@ import java.util.UUID;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // custom exception for business logic
+    @ExceptionHandler(EmiCalculationException.class)
+    public ResponseEntity<ErrorResponse> handleEmiCalculation(
+            EmiCalculationException ex, HttpServletRequest req) {
+
+        log.error("EMI calculation failed for request on {}: {}", req.getRequestURI(), ex.getMessage(), ex);
+
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.UNPROCESSABLE_CONTENT.value())
+                        .error(HttpStatus.UNPROCESSABLE_CONTENT.getReasonPhrase())
+                        .errorCode(ErrorCode.EMI_CALCULATION_FAILED.name())
+                        .message("Loan EMI calculation failed. Please check loan parameters.")
+                        .path(req.getRequestURI())
+                        .traceId(generateTraceId())
+                        .build());
+    }
+
     // Handle @Valid Request Body Errors
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
