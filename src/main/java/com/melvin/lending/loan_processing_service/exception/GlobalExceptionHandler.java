@@ -18,6 +18,8 @@ import java.util.UUID;
 public class GlobalExceptionHandler {
 
     // custom exception for business logic
+
+    // a. EmiCalculationException handler
     @ExceptionHandler(EmiCalculationException.class)
     public ResponseEntity<ErrorResponse> handleEmiCalculation(
             EmiCalculationException ex, HttpServletRequest req) {
